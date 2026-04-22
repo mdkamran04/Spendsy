@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url  	    = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model User {
+  id            String        @id // From Clerk
+  email         String        @unique
+  monthlyIncome Float?
+  monthlyBudget Float?
+  savingsTarget Float?
+  savingsMonths Int?
+  createdAt     DateTime      @default(now())
+  transactions  Transaction[]
+  insights      Insight[]
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  userId        String
+  amount        Float
+  category      String
+  note          String?
+  date          DateTime
+  paymentMethod String?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Insight {
+  id        String   @id @default(uuid())
+  userId    String
+  content   String
+  type      String   // trend, warning, suggestion
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}

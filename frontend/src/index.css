@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 212 35% 96%;
+    --foreground: 224 26% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 24% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 24% 14%;
+    --primary: 214 82% 54%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 34% 91%;
+    --secondary-foreground: 224 24% 20%;
+    --muted: 215 32% 92%;
+    --muted-foreground: 220 15% 43%;
+    --accent: 214 58% 92%;
+    --accent-foreground: 218 55% 30%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 28% 84%;
+    --input: 214 28% 84%;
+    --ring: 214 82% 54%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 35% 8%;
+    --foreground: 210 20% 94%;
+    --card: 222 28% 12%;
+    --card-foreground: 210 20% 94%;
+    --popover: 222 28% 12%;
+    --popover-foreground: 210 20% 94%;
+    --primary: 212 100% 68%;
+    --primary-foreground: 222 40% 10%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 210 20% 94%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 217 16% 68%;
+    --accent: 214 36% 24%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 219 18% 24%;
+    --input: 219 18% 24%;
+    --ring: 212 100% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(1000px 480px at 0% -20%, hsl(206 90% 88% / 0.55), transparent 55%),
+      radial-gradient(900px 520px at 100% 0%, hsl(220 80% 86% / 0.45), transparent 60%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(212 32% 93%));
+    background-attachment: fixed;
+    font-family: "SF Pro Display", "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .glass-surface {
+    background-color: hsl(var(--card) / 0.62);
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    border: 1px solid hsl(var(--border) / 0.55);
+    box-shadow:
+      0 10px 30px -18px hsl(220 30% 10% / 0.45),
+      inset 0 1px 0 hsl(0 0% 100% / 0.35);
+  }
+
+  .glass-topbar {
+    background: linear-gradient(
+      140deg,
+      hsl(var(--background) / 0.86),
+      hsl(var(--card) / 0.5)
+    );
+    backdrop-filter: blur(14px) saturate(1.08);
+    -webkit-backdrop-filter: blur(14px) saturate(1.08);
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+  }
+}
