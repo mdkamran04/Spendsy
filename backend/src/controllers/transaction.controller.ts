@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { syncUser } from '../services/auth.service';
-import { autoCategorize } from '../services/categorization.service';
+import { autoCategorize, normalizeCategoryInput, ALLOWED_CATEGORIES } from '../services/categorization.service';
 import { detectBehaviorInsights } from '../services/behavior.service';
+import { aggregateSpending } from '../services/aggregation.service';
 
 const parseAmountInput = (value: unknown): number => {
   if (typeof value === 'number') {
@@ -47,8 +48,15 @@ export const addTransaction = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'amount must be a positive number' });
     }
 
-    // Use provided category, or auto-categorize based on note
-    const finalCategory = category || (note ? autoCategorize(note) : 'Others');
+    const normalizedCategory = normalizeCategoryInput(category);
+    if (category !== undefined && category !== null && category !== '' && !normalizedCategory) {
+      return res.status(400).json({
+        error: `Invalid category. Allowed categories: ${ALLOWED_CATEGORIES.join(', ')}`
+      });
+    }
+
+    // Use provided category, otherwise infer from note (keyword first, AI fallback), then Others.
+    const finalCategory = normalizedCategory ?? await autoCategorize(note);
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -77,11 +85,26 @@ export const updateTransaction = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'amount must be a positive number' });
     }
 
+    const normalizedCategory = normalizeCategoryInput(category);
+    if (category !== undefined && category !== null && category !== '' && !normalizedCategory) {
+      return res.status(400).json({
+        error: `Invalid category. Allowed categories: ${ALLOWED_CATEGORIES.join(', ')}`
+      });
+    }
+
+    let nextCategory: string | undefined;
+    if (normalizedCategory) {
+      nextCategory = normalizedCategory;
+    } else if (category === '' || category === null) {
+      const inferredCategory = await autoCategorize(note);
+      nextCategory = inferredCategory;
+    }
+
     const result = await prisma.transaction.updateMany({
       where: { id, userId: user.id },
       data: {
         amount: parsedAmount,
-        category: category || undefined,
+        category: nextCategory,
         note: note ?? undefined,
         date: date ? new Date(date) : undefined,
         paymentMethod: paymentMethod ?? undefined
@@ -142,25 +165,21 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       orderBy: { date: 'asc' }
     });
 
-    const totalSpentThisMonth = monthlyTransactions.reduce((acc, t) => acc + t.amount, 0);
+    const monthlyAggregation = aggregateSpending(monthlyTransactions);
+    const rollingAggregation = aggregateSpending(last30DaysTransactions);
+
+    const totalSpentThisMonth = monthlyAggregation.totalSpent;
     const remainingBudget = (user.monthlyBudget || 0) - totalSpentThisMonth;
 
-    const categoryBreakdown = monthlyTransactions.reduce((acc: Record<string, number>, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {});
+    const pieChartData = monthlyAggregation.categoryTotals.map((item) => ({
+      name: item.category,
+      value: item.total
+    }));
 
-    const pieChartData = Object.entries(categoryBreakdown).map(([name, value]) => ({ name, value }));
-
-    const spendingByDay = last30DaysTransactions.reduce((acc: Record<string, number>, tx) => {
-      const key = tx.date.toISOString().split('T')[0];
-      acc[key] = (acc[key] || 0) + tx.amount;
-      return acc;
-    }, {});
-
-    const dailyTrendData = Object.entries(spendingByDay)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, value]) => ({ date: toDateLabel(new Date(date)), value }));
+    const dailyTrendData = rollingAggregation.dailySeries.map((point) => ({
+      date: toDateLabel(new Date(point.date)),
+      value: point.amount
+    }));
 
     const spendingByWeek = monthlyTransactions.reduce((acc: Record<string, number>, tx) => {
       const week = `Week ${getWeekOfMonth(tx.date)}`;
@@ -204,6 +223,13 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       projectedOverBy,
       dailyAvg,
       dailySpendLimit,
+      aggregation: {
+        categoryTotals: rollingAggregation.categoryTotals,
+        dailyAverage: rollingAggregation.dailyAverage,
+        weekdayDailyAverage: rollingAggregation.weekdayDailyAverage,
+        weekendDailyAverage: rollingAggregation.weekendDailyAverage,
+        trends: rollingAggregation.trends
+      },
       behaviorFlags,
       savingsGoal
     });

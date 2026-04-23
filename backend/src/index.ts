@@ -5,6 +5,7 @@ import { requireAuth } from '@clerk/express';
 import transactionRoutes from './routes/transaction.routes';
 import insightRoutes from './routes/insight.routes';
 import userRoutes from './routes/user.routes';
+import premiumRoutes from './routes/premium.routes';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ declare global {
 app.use('/api/transactions', requireAuth(), transactionRoutes);
 app.use('/api/insights', requireAuth(), insightRoutes);
 app.use('/api/user', requireAuth(), userRoutes);
+app.use('/api/premium', requireAuth(), premiumRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

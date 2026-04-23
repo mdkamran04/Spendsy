@@ -3,6 +3,7 @@ import prisma from '../utils/prisma';
 import { generateInsightsFromData, chatWithAi } from '../services/ai.service';
 import { syncUser } from '../services/auth.service';
 import { detectBehaviorInsights } from '../services/behavior.service';
+import { aggregateSpending } from '../services/aggregation.service';
 
 export const generateInsights = async (req: Request, res: Response) => {
   try {
@@ -23,18 +24,16 @@ export const generateInsights = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    // Basic summary for AI
-    const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const categoryTotals = transactions.reduce((acc: any, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {});
+    // First-level intelligence summary for AI and rule engine.
+    const aggregation = aggregateSpending(transactions);
 
     const context = {
       monthlyBudget: user.monthlyBudget,
-      totalSpent,
-      categoryTotals,
-      transactionsCount: transactions.length
+      totalSpent: aggregation.totalSpent,
+      categoryTotals: aggregation.categoryTotals,
+      dailyAverage: aggregation.dailyAverage,
+      trends: aggregation.trends,
+      transactionsCount: aggregation.transactionCount
     };
 
     const aiInsights = await generateInsightsFromData(context);

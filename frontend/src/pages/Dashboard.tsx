@@ -23,6 +23,8 @@ import {
 import { IndianRupee, TrendingUp, AlertCircle, CreditCard, Target } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useToast } from '../components/ToastContext';
+import { SpendingScore } from '../components/SpendingScore';
+import { MoneyPersonality } from '../components/MoneyPersonality';
 
 type InsightFlag = {
   content: string;
@@ -78,6 +80,12 @@ export default function Dashboard() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
 
+  // Premium features
+  const [spendingScoreData, setSpendingScoreData] = useState<any>(null);
+  const [moneyPersonalityData, setMoneyPersonalityData] = useState<any>(null);
+  const [premiumLoading, setPremiumLoading] = useState(false);
+  const [premiumError, setPremiumError] = useState<string | undefined>(undefined);
+
   const [monthlyIncome, setMonthlyIncome] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
@@ -85,6 +93,8 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     setLoading(true);
+    setPremiumLoading(true);
+    setPremiumError(undefined);
     try {
       const [statsRes, profileRes] = await Promise.all([
         api.get('/transactions/dashboard'),
@@ -98,11 +108,26 @@ export default function Dashboard() {
       setMonthlyBudget(String(profileRes.data.monthlyBudget ?? ''));
       setTargetAmount(String(profileRes.data.savingsTarget ?? ''));
       setDurationMonths(String(profileRes.data.savingsMonths ?? 6));
+
+      // Load premium features in parallel
+      try {
+        const [scoreRes, personalityRes] = await Promise.all([
+          api.post('/premium/spending-score'),
+          api.post('/premium/money-personality')
+        ]);
+
+        setSpendingScoreData(scoreRes.data);
+        setMoneyPersonalityData(personalityRes.data);
+      } catch (err: any) {
+        console.warn('Failed to load premium features:', err.message);
+        setPremiumError('Premium features not available');
+      }
     } catch (error) {
       console.error(error);
       toast('Failed to load dashboard data.', 'error');
     } finally {
       setLoading(false);
+      setPremiumLoading(false);
     }
   };
 
@@ -175,7 +200,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -295,7 +320,24 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Premium Features Section */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+          <SpendingScore
+            data={spendingScoreData}
+            loading={premiumLoading}
+            error={premiumError} />
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+          <MoneyPersonality
+            data={moneyPersonalityData}
+            loading={premiumLoading}
+            error={premiumError} />
+        </motion.div>
+      </div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Weekly Spend Overview</CardTitle>
@@ -338,7 +380,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       <div className="grid gap-4 lg:grid-cols-2" id="goals">
         <Card>
@@ -357,8 +399,7 @@ export default function Dashboard() {
                   type="number"
                   value={monthlyIncome}
                   onChange={(e) => setMonthlyIncome(e.target.value)}
-                  placeholder="e.g. 50000"
-                />
+                  placeholder="e.g. 50000" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="budget">Monthly Budget (Rs)</Label>
@@ -367,8 +408,7 @@ export default function Dashboard() {
                   type="number"
                   value={monthlyBudget}
                   onChange={(e) => setMonthlyBudget(e.target.value)}
-                  placeholder="e.g. 25000"
-                />
+                  placeholder="e.g. 25000" />
               </div>
             </div>
             <Button onClick={saveProfile} disabled={savingProfile}>
@@ -390,8 +430,7 @@ export default function Dashboard() {
                   type="number"
                   value={targetAmount}
                   onChange={(e) => setTargetAmount(e.target.value)}
-                  placeholder="e.g. 120000"
-                />
+                  placeholder="e.g. 120000" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="duration">Duration (months)</Label>
@@ -401,12 +440,11 @@ export default function Dashboard() {
                   min={1}
                   value={durationMonths}
                   onChange={(e) => setDurationMonths(e.target.value)}
-                  placeholder="e.g. 12"
-                />
+                  placeholder="e.g. 12" />
               </div>
             </div>
 
-            {stats?.savingsGoal && (
+            {stats && stats.savingsGoal && (
               <div className="rounded-md border p-3 bg-muted/30 text-sm">
                 <p>Monthly saving needed: <span className="font-semibold">Rs {stats.savingsGoal.monthlySavingNeeded.toFixed(2)}</span></p>
                 <p>Daily saving target: <span className="font-semibold">Rs {stats.savingsGoal.dailySavingNeeded.toFixed(2)}</span></p>
@@ -425,7 +463,7 @@ export default function Dashboard() {
           <CardTitle>Behavior Detection Alerts</CardTitle>
         </CardHeader>
         <CardContent>
-          {stats?.behaviorFlags?.length ? (
+          {stats?.behaviorFlags && stats.behaviorFlags.length ? (
             <div className="space-y-3">
               {stats.behaviorFlags.map((flag, idx) => (
                 <div key={`${flag.type}-${idx}`} className="rounded-md border p-3 bg-muted/20">
@@ -443,6 +481,6 @@ export default function Dashboard() {
       {profile && (
         <p className="text-xs text-muted-foreground">Profile synced for {profile.monthlyIncome !== null ? 'configured user' : 'new user'}.</p>
       )}
-    </div>
+    </>
   );
 }
